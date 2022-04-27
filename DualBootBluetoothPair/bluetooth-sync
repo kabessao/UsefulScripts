@@ -1,0 +1,32 @@
+#!/bin/bash
+
+TMP_DIR=/tmp/dualbootbluetoothpair
+TMP_FILE=$TMP_DIR/devices.reg
+
+if ! cd /run/media/*/*/Windows/System32/config 2> /dev/null ; then  
+  echo "Windows partition not mounted!" 
+  exit
+fi
+
+mkdir $TMP_DIR 2> /dev/null
+
+reged -x SYSTEM nil ControlSet001\\Services\\BTHPORT\\Parameters\\Keys\\ $TMP_FILE > /dev/null 2>&1
+
+
+for line in `grep hex $TMP_FILE | sed -e 's;";;g' -e 's;=hex;;g' -e 's;,;;g' |  tr [:lower:] [:upper:]` ; do
+  key=`awk -F: '{print $1}' <<< "$line"`
+  key=`sed -E 's;([0-9a-zA-Z]{2});\1:;g' <<< "$key"`
+  key=${key:0:$((${#key} -1))}
+
+  value=`awk -F: '{print $2}' <<< "$line"`
+
+  if cd /var/lib/bluetooth/00:05:16:5C:2A:32/$key ; then
+    echo setting $key to $value
+    vim +"/Key=" +"normal f=lC${value}" +"normal J" +wq info
+  else 
+    echo device $key not found
+  fi
+
+done
+
+systemctl restart bluetooth 
